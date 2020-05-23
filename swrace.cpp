@@ -6,23 +6,361 @@
 #include "swrace.h"
 #include <random>
 
+//TODO vedere se lenght serve
+
 using namespace std;
 
+//Directives regarding cell content
 #define EMPTY 0
 #define WHITE 1
 #define BLACK 2
+//Directives for path contruction
 #define LEFT 'L'
 #define RIGHT 'R'
 #define UP 'U'
 #define DOWN 'D'
-#define MAX_LEN 256*256+1
 #define END '#'
+//Define max path length 
+#define MAX_LEN 256*256+1
 
+//Output file where che results are saved
 ofstream out("output.txt");
-ofstream tuo("tuptuo.txt");
 
-bool goUp(int *i, int *j, int N, int M, vector<vector<int>>& matrix, char *path, int *cursor, int *length, int *nRing){
-    //cout << "ciao" << endl;
+/**
+ * Recerences: Unordered Set -  https://www.geeksforgeeks.org/how-to-create-an-unordered_set-of-user-defined-class-or-struct-in-c/
+ */
+
+
+/**
+ * Struct cell contains ring informations
+ *      row/col: position of the ring in the matrix
+ *      type: type of ring
+ *      latestMove: valid moves that indicate the possible moves from this ring
+ *      valid: indicate if the conditions of the ring were aldready satisfied
+ *      id: unique id that idetify the ring
+ */
+struct Cell {
+    int row;
+    int col;
+    int type;
+    vector<char> latestMove;
+    bool valid = false;
+    int id; 
+  
+    // This function is used by unordered_set to compare elements 
+    bool operator==(const Cell& t) const{ 
+        return (this->id == t.id); 
+    } 
+}; 
+
+  
+/*
+ * Hash function used by ordered set to insert/find/remove element
+ */
+class MyHashFunction { 
+    public: 
+    // id is returned as hash function 
+    size_t operator()(const Cell& t) const { 
+        return t.id; 
+    } 
+};
+
+/**
+ * function used to sort the elements of the set
+ * args:
+ *      i: first pair to sort
+ *      j: second pair to sort
+ * return:
+ *      true: if the first element is less than the second
+ *      false: if the first element is greater or equal than the second
+ */
+bool sortVector (pair<int, char> i, pair<int, char> j) { return (i.first < j.first); }
+
+/**
+ * Function that returns true if a move is valid, false if it is invalid.
+ * It checks if the move does not go out of the matrix and the cell has not already been visited.
+ * args:
+ *      visited: reference to the visited matrix
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      nextRow: next move row
+ *      nextCol: next move column
+ * return:
+ *      true: if the move is valid
+ *      false: if the first element is greater or equal than the second
+ */
+bool stop(vector<vector<bool>>& visited, int N, int M, int nextRow, int nextCol);
+
+
+/**
+ * Function that goes up until it founds a black ring
+ * args:
+ *      i: pointer to the current row index
+ *      j: pointer to the current column index
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      ringsSet: set containing all the rings
+ *      path: solution path
+ *      cursor: cursor that points to the solution path's cell where to enter the next move
+ *      length: lenght of the solution string
+ *      nRing: number of encountered rings
+ * return:
+ *      true: if the black ring is found
+ *      false: if the black ring is not found
+ */
+bool goUp(int *i, int *j, const int N, const int M, unordered_set<Cell, MyHashFunction>& ringsSet, char *path, int *cursor, int *length, int *nRing);
+
+/**
+ * Function that goes down until it founds a black ring
+ * args:
+ *      i: pointer to the current row index
+ *      j: pointer to the current column index
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      ringsSet: set containing all the rings
+ *      path: solution path
+ *      cursor: cursor that points to the solution path's cell where to enter the next move
+ *      length: lenght of the solution string
+ *      nRing: number of encountered rings
+ * return:
+ *      true: if the black ring is found
+ *      false: if the black ring is not found
+ */
+bool goDown(int *i, int *j, int N, int M, unordered_set<Cell, MyHashFunction>& ringsSet, char *path, int *cursor, int *length, int *nRing);
+
+/**
+ * Function that goes left until it founds a black ring
+ * args:
+ *      i: pointer to the current row index
+ *      j: pointer to the current column index
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      ringsSet: set containing all the rings
+ *      path: solution path
+ *      cursor: cursor that points to the solution path's cell where to enter the next move
+ *      length: lenght of the solution string
+ *      nRing: number of encountered rings
+ * return:
+ *      true: if the black ring is found
+ *      false: if the black ring is not found
+ */
+bool goLeft(int *i, int *j, int N, int M, unordered_set<Cell, MyHashFunction>& ringsSet, char *path, int *cursor, int *length, int *nRing);
+
+/**
+ * Function that goes left until it founds a black ring
+ * args:
+ *      i: pointer to the current row index
+ *      j: pointer to the current column index
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      ringsSet: set containing all the rings
+ *      path: solution path
+ *      cursor: cursor that points to the solution path's cell where to enter the next move
+ *      length: lenght of the solution string
+ *      nRing: number of encountered rings
+ * return:
+ *      true: if the black ring is found
+ *      false: if the black ring is not found
+ */
+bool goRigth(int *i, int *j, int N, int M, unordered_set<Cell, MyHashFunction>& ringsSet, char *path, int *cursor, int *length, int *nRing);
+
+/**
+ * Function that return the possible moves from a specific position to another position
+ * args:
+ *      visited: matrix of visited element
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      curretCell: current position where to start to find the possibile moves
+ *      next: destination cell where we want to arrive
+ *      pruntedMoves: array of valid moves we can take
+ *      changeDirection: indicates if we have to turn in the next move 
+ *      path: solution path
+ *      cursor: cursor that points to the solution path's cell where to enter the next move
+ *      us: set containing all the remaining rings
+ *      goStraightOn: indicates if we have to go straight on in the next move 
+ * return:
+ *      true: if in the next moves we have to go straight on
+ *      false: if we have no constraint in the next move
+ */
+bool preferredDirection(vector<vector<bool>>& visited, int N, int M, Cell& currentCell, Cell& next, vector<char>& prunedMoves, bool& changeDirection, char *path, int cursor, unordered_set<Cell, MyHashFunction>& us, bool& goStraightOn);
+
+/**
+ * Function that return the possible moves from a specific ring to another position
+ * args:
+ *      visited: matrix of visited element
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      curretCell: current position of the ring where to start to find the possibile moves
+ *      next: destination cell where we want to arrive
+ *      pruntedMoves: array of valid moves we can take
+ *      changeDirection: indicates if we have to turn in the next move 
+ *      path: solution path
+ *      cursor: cursor that points to the solution path's cell where to enter the next move
+ *      us: set containing all the remaining rings
+ *      goStraightOn: indicates if we have to go straight on in the next move 
+ * return:
+ *      true: if in the next moves we have to go straight on
+ *      false: if we have no constraint in the next move
+ */
+bool preferredRingDirection(vector<vector<bool>>& visited, int N, int M, Cell& currentCell, Cell& next, vector<char>& prunedMoves, char *path, int cursor, bool& changeDirection, unordered_set<Cell, MyHashFunction>& us, bool& goStraightOn);
+
+/**
+ * Function that returns the nearest ring to a specific position based on distance
+ * args:
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      ringsSet: set containing all the rings
+ *      startRow: starting row
+ *      startCol: starting column
+ * return:
+ *      min: the cell that is closest to the current position
+ */
+Cell nearestRing(int N, int M, unordered_set<Cell, MyHashFunction>& ringsSet, int startRow, int startCol);
+
+/**
+ * Function that returns the nearest ring from a specific position based on distance or return a random element where to go
+ * The return value is choose based on probability
+ * args:
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      ringsSet: set containing all the rings
+ *      startRow: starting row
+ *      startCol: starting column
+ * return:
+ *      min: the cell where to go from the current position
+ */
+Cell maybeNotNearestRing(int N, int M, unordered_set<Cell, MyHashFunction>& ringsSet, int startRow, int startCol);
+
+/**
+ * Function that sets a ring as a safe ring
+ * args:
+ *      currentRing: current ring, the ring wich will be set as a safe one
+ *      safeRing: the resulting safe ring
+ */
+void setSafeRing(Cell& currentRing, Cell& safeRing);
+
+/**
+ * Wrapper function for greedyRecursion function. Used to avoid explicit copy of unordered set
+ * args:
+ *      nextRing: ring where to start the path
+ *      unvisitedRings: set containing all the rings to visit
+ *      validRing: set of valid visited rings 
+ *      totalRings: set containing all the rings of the problem
+ *      ringAmount: total number of rings (B+W) of the problem
+ *      path: current solution path
+ *      cursor: current solution cursor (move index)
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      visited: visited cells matrix
+ *      partialPoint: worth of the curret path
+ *      turnToClose: number of moves to do before try to close the path and get back to the starting ring
+ * return:
+ *      number of valid visited rings in the path
+ */
+int greedyWrapper(Cell nextRing, unordered_set<Cell, MyHashFunction> unvisitedRings, unordered_set<Cell, MyHashFunction> validRings, unordered_set<Cell, MyHashFunction> totalRings, int ringsAmount, char *path, int cursor, int N, int M, vector<vector<bool>> visited, double &partialPoint, int turnToClose);
+
+/**
+ * Wrapper function for notSoGreedyRecursion function. Used to avoid explicit copy of unordered set
+ * args:
+ *      nextRing: ring where to start the path
+ *      unvisitedRings: set containing all the rings to visit
+ *      validRing: set of valid visited rings 
+ *      totalRings: set containing all the rings of the problem
+ *      ringAmount: total number of rings (B+W) of the problem
+ *      path: current solution path
+ *      cursor: current solution cursor (move index)
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      visited: visited cells matrix
+ *      partialPoint: worth of the curret path
+ *      turnToClose: number of moves to do before try to close the path and get back to the starting ring
+ * return:
+ *      number of valid visited rings in the path
+ */
+int notSoGreedyWrapper(Cell nextRing, unordered_set<Cell, MyHashFunction> unvisitedRings, unordered_set<Cell, MyHashFunction> validRings, unordered_set<Cell, MyHashFunction> totalRings, int ringsAmount, char *path, int cursor, int N, int M, vector<vector<bool>> visited, double &partialPoint, int turnToClose);
+
+/**
+ *  THE GREAT WALL OF CHINA
+ */
+
+/**
+ * Main function: ONE OF THE BRICK
+ * It is based on an unproven but easily understood greedy principle, that is "scegli sempre la strada più facile" that means "always take the shortest way".
+ * In fact we noticed that in some cases where there is a "low density of rings" it is very convenient to choose the ring closest to the current one as a target ring.
+ * This function basically implements the choice to try to always reach the nearest ring by following the problem's rules
+ * args:
+ *      nextRing: ring chosen as target
+ *      startRing: starting ring1
+ *      safeRing: latest safe ring
+ *      currentRow: current row in the matrix
+ *      currentCol: current col in the matrix
+ *      unvisitedRings: set of unvisited rings
+ *      validRings: set of valid rings
+ *      totalRings: set that contains all the rings 
+ *      currentRing: number of encountered rings 
+ *      ringsAmount: number of total rings
+ *      path: current solution path
+ *      cursor: current solution cursor (move index)
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      visited: visited cells matrix
+ *      pendingMoves: number of pending moves
+ *      toUnlock: stack which contains the pending moves that can be unlocked if a better path is found
+ *      changeDirection: indicates whether it is necessary to change direction
+ *      move: previous move
+ *      partialSolution: score of the partial solution that is found
+ *      goStraightOn: indicates whether it is necessary to go straight on
+ *      turnToClose: number of moves that the algorithm will consider the starting ring as the target ring for creating a closed path
+ * returns:
+ *      true: it can be either because he has found the best solution, or because he has no more moves available considering the path taken so far
+ *      false: the recursion is not finished yet 
+ */
+bool greedyRecursion(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, int currentCol, unordered_set<Cell, MyHashFunction>& unvisitedRings, unordered_set<Cell, MyHashFunction>& validRings, unordered_set<Cell, MyHashFunction>& totalRings, int currentRings, const int ringsAmount, char *path, int& cursor, const int N, const int M, vector<vector<bool>> &visited, int pendingMoves, stack<pair<int, int>>& toUnlock, bool changeDirection, char move, double &partialSolution, bool& goStraightOn, int turnToClose);
+
+/**
+ * Main function part 2. 
+ * It is based on a simple expression, that is "non sempre la strada più giusta è la più semplice" that means "The right way is not always the easiest".
+ * In fact we noticed that in some cases where there is an "high density of rings" it is more convenient to choose the not always the nearest. The target could be either the closest or a random one.
+ * This function basically chooses with 50% probability the nearest ring, with the other 50% a random one.
+ * args:
+ *      nextRing: ring chosen as target
+ *      startRing: starting ring1
+ *      safeRing: latest safe ring
+ *      currentRow: current row in the matrix
+ *      currentCol: current col in the matrix
+ *      unvisitedRings: set of unvisited rings
+ *      validRings: set of valid rings
+ *      totalRings: set that contains all the rings 
+ *      currentRing: number of encountered rings 
+ *      ringsAmount: number of total rings
+ *      path: current solution path
+ *      cursor: current solution cursor (move index)
+ *      N: number of rows in the table
+ *      M: number of columns in the table
+ *      visited: visited cells matrix
+ *      pendingMoves: number of pending moves
+ *      toUnlock: stack which contains the pending moves that can be unlocked if a better path is found
+ *      changeDirection: indicates whether it is necessary to change direction
+ *      move: previous move
+ *      partialSolution: score of the partial solution that is found
+ *      goStraightOn: indicates whether it is necessary to go straight on
+ *      turnToClose: number of moves that the algorithm will consider the starting ring as the target ring for creating a closed path
+ * returns:
+ *      true: it can be either because he has found the best solution, or because he has no more moves available considering the path taken so far
+ *      false: the recursion is not finished yet 
+ */
+bool notSoGreedyRecursion(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, int currentCol, unordered_set<Cell, MyHashFunction>& unvisitedRings, unordered_set<Cell, MyHashFunction>& validRings, unordered_set<Cell, MyHashFunction>& totalRings, int currentRings, const int ringsAmount, char *path, int& cursor, const int N, const int M, vector<vector<bool>> &visited, int pendingMoves, stack<pair<int, int>>& toUnlock, bool changeDirection, char move, double &partialSolution, bool& goStraightOn, int turnToClose);
+
+bool stop(vector<vector<bool>>& visited, int N, int M, int nextRow, int nextCol){
+    bool needToStop = false;
+    if(nextRow >= N || nextCol >= M || nextRow < 0 || nextCol < 0 || visited[nextRow][nextCol]){
+        needToStop = true;
+    }
+    return needToStop;
+}
+
+bool goUp(int *i, int *j, const int N, const int M, unordered_set<Cell, MyHashFunction>& ringsSet, char *path, int *cursor, int *length, int *nRing){
+    Cell currentCell;
     bool found = false;
     int resetI, resetCursor, resetLength, resetNRing;
     resetI = *i;
@@ -31,11 +369,16 @@ bool goUp(int *i, int *j, int N, int M, vector<vector<int>>& matrix, char *path,
     resetNRing =  *nRing;
     *i = *i-1;
     while(*i >= 0 && !found){
-        if(matrix[*i][*j] == BLACK){
+        currentCell.id = (*i)*M + (*j);
+        currentCell.type = EMPTY;
+        if(ringsSet.find(currentCell) != ringsSet.end()){
+            currentCell = *(ringsSet.find(currentCell));
+        }
+        if(currentCell.type == BLACK){
             *nRing +=1;
             found = true;
         } else {
-            if(matrix[*i][*j] == WHITE){
+            if(currentCell.type == WHITE){
                 *nRing +=1;
             }
             *i = *i-1;
@@ -54,8 +397,9 @@ bool goUp(int *i, int *j, int N, int M, vector<vector<int>>& matrix, char *path,
     return found;
 }
 
-bool goDown(int *i, int *j, int N, int M, vector<vector<int>>& matrix, char *path, int *cursor, int *length, int *nRing){
-    //cout << "ciao 2" << endl;
+
+bool goDown(int *i, int *j, int N, int M, unordered_set<Cell, MyHashFunction>& ringsSet, char *path, int *cursor, int *length, int *nRing){
+    Cell currentCell;
     bool found = false;
     int resetI, resetCursor, resetLength, resetNRing;
     resetI = *i;
@@ -64,11 +408,16 @@ bool goDown(int *i, int *j, int N, int M, vector<vector<int>>& matrix, char *pat
     resetNRing =  *nRing;
     *i = *i+1;
     while(*i < N && !found){
-        if(matrix[*i][*j] == BLACK){
+        currentCell.id = (*i)*M + (*j);
+        currentCell.type = EMPTY;
+        if(ringsSet.find(currentCell) != ringsSet.end()){
+            currentCell = *(ringsSet.find(currentCell));
+        }
+        if(currentCell.type == BLACK){
             *nRing +=1;
             found = true;
         } else {
-            if(matrix[*i][*j] == WHITE){
+            if(currentCell.type == WHITE){
                 *nRing +=1;
             }
             *i = *i+1;
@@ -87,7 +436,9 @@ bool goDown(int *i, int *j, int N, int M, vector<vector<int>>& matrix, char *pat
     return found;
 }
 
-bool goLeft(int *i, int *j, int N, int M, vector<vector<int>>& matrix, char *path, int *cursor, int *length, int *nRing){
+
+bool goLeft(int *i, int *j, int N, int M, unordered_set<Cell, MyHashFunction>& ringsSet, char *path, int *cursor, int *length, int *nRing){
+    Cell currentCell;
     bool found = false;
     int resetJ, resetCursor, resetLength, resetNRing;
     resetJ = *j;
@@ -96,11 +447,16 @@ bool goLeft(int *i, int *j, int N, int M, vector<vector<int>>& matrix, char *pat
     resetNRing =  *nRing;
     *j = *j-1;
     while(*j >= 0 && !found){
-        if(matrix[*i][*j] == BLACK){
+        currentCell.id = (*i)*M + (*j);
+        currentCell.type = EMPTY;
+        if(ringsSet.find(currentCell) != ringsSet.end()){
+            currentCell = *(ringsSet.find(currentCell));
+        }
+        if(currentCell.type == BLACK){
             *nRing +=1;
             found = true;
         } else {
-            if(matrix[*i][*j] == WHITE){
+            if(currentCell.type == WHITE){
                 *nRing +=1;
             }
             *j = *j-1;
@@ -119,7 +475,8 @@ bool goLeft(int *i, int *j, int N, int M, vector<vector<int>>& matrix, char *pat
     return found;
 }
 
-bool goRigth(int *i, int *j, int N, int M, vector<vector<int>>& matrix, char *path, int *cursor, int *length, int *nRing){
+bool goRigth(int *i, int *j, int N, int M, unordered_set<Cell, MyHashFunction>& ringsSet, char *path, int *cursor, int *length, int *nRing){
+    Cell currentCell;
     bool found = false;
     int resetJ, resetCursor, resetLength, resetNRing;
     resetJ = *j;
@@ -128,11 +485,16 @@ bool goRigth(int *i, int *j, int N, int M, vector<vector<int>>& matrix, char *pa
     resetNRing =  *nRing;
     *j = *j+1;
     while(*j < M && !found){
-        if(matrix[*i][*j] == BLACK){
+        currentCell.id = (*i)*M + (*j);
+        currentCell.type = EMPTY;
+        if(ringsSet.find(currentCell) != ringsSet.end()){
+            currentCell = *(ringsSet.find(currentCell));
+        }
+        if(currentCell.type == BLACK){
             *nRing +=1;
             found = true;
         } else {
-            if(matrix[*i][*j] == WHITE){
+            if(currentCell.type == WHITE){
                 *nRing +=1;
             }
             *j = *j+1;
@@ -151,96 +513,8 @@ bool goRigth(int *i, int *j, int N, int M, vector<vector<int>>& matrix, char *pa
     return found;
 }
 
-void printMatrix(vector<vector<int>>& matrix, int N, int M){
-    for(int i = 0; i < N; i++){
-        for(int j = 0; j < M; j++){
-            //cout << matrix[i][j] << " ";
-        }
-        //cout << endl;
-    }
-}
 
-void printVisited(vector<vector<bool>>& matrix, int N, int M){
-    for(int i = 0; i < N; i++){
-        for(int j = 0; j < M; j++){
-            //cout << matrix[i][j] << " ";
-        }
-        //cout << endl;
-    }
-}
-
-/**
- * Links for reference
- * Unordered Set: https://www.geeksforgeeks.org/how-to-create-an-unordered_set-of-user-defined-class-or-struct-in-c/
- */
-
-// Structure definition 
-struct Cell {
-    int row;
-    int col;
-    int type;
-    vector<char> latestMove;
-    bool valid = false;
-    int priority;
-    int id; 
-  
-    // This function is used by unordered_set to compare 
-    // elements of Test. 
-    bool operator==(const Cell& t) const
-    { 
-        return (this->id == t.id); 
-    } 
-}; 
-
-bool stop(Cell& start, vector<vector<bool>>& visited, int N, int M, int nextRow, int nextCol){
-    bool needToStop = false;
-    if(nextRow >= N || nextCol >= M || nextRow < 0 || nextCol < 0 || visited[nextRow][nextCol]){
-        needToStop = true;
-    }
-    return needToStop;
-}
-  
-// class for hash function 
-class MyHashFunction { 
-    public: 
-    // id is returned as hash function 
-    size_t operator()(const Cell& t) const
-    { 
-        return t.id; 
-    } 
-};
-
-bool sortVector (pair<int, char> i, pair<int, char> j) { return (i.first < j.first); }
-
-unordered_set<Cell, MyHashFunction>::iterator nearestRing(int N, int M, unordered_set<Cell, MyHashFunction>& us, int startRow, int startCol){
-    int minDistance = INT_MAX;
-    int minPriority = INT_MAX;
-    int tmpMin;
-    Cell min;
-    min.row = N;
-    min.col = M;
-    unordered_set<Cell, MyHashFunction> :: iterator itr;
-    itr = us.begin();
-    for(auto it = us.begin(); it != us.end(); it++){
-        tmpMin = abs(startRow - (*it).row) + abs(startCol - (*it).col);
-        if((*it).priority < minPriority){
-            minDistance = tmpMin;
-            minPriority = (*it).priority;
-            min = *it;
-            itr = it;
-        } else if((*it).priority == minPriority){
-            if(minDistance > tmpMin){
-                minDistance = tmpMin;
-                minPriority = (*it).priority;
-                min = *it;
-                itr = it;
-            }
-        }
-    }
-    return itr;
-}
-
-bool preferredDirection(Cell& start, vector<vector<bool>>& visited, int N, int M, Cell& currentCell, Cell& next, vector<char>& prunedMoves, bool& changeDirection, char *path, int cursor, unordered_set<Cell, MyHashFunction>& us, bool& goStraightOn){
+bool preferredDirection(vector<vector<bool>>& visited, int N, int M, Cell& currentCell, Cell& next, vector<char>& prunedMoves, bool& changeDirection, char *path, int cursor, unordered_set<Cell, MyHashFunction>& us, bool& goStraightOn){
     int choice[2] = {-1, 1};
     int minDistance = INT_MAX;
     int tmpMin;
@@ -255,39 +529,19 @@ bool preferredDirection(Cell& start, vector<vector<bool>>& visited, int N, int M
         }
         bool atLeastOneBlocked = false;
         switch(i){
-            case 0:  choice_dist.second = UP;
-                /*if(currentCell.col == next.col){
-                    if(currentCell.row+choice[i/2] < currentCell.row){
-                            choice_dist.first += 2;
-                    }
-                }*/
+            case 0: choice_dist.second = UP;
                 break;
             case 1: choice_dist.second = LEFT;
-                /*if(currentCell.row == next.row){
-                    if(currentCell.col+choice[i/2] < currentCell.col){
-                            choice_dist.first += 2;
-                    }
-                }*/
                 break;
             case 2: choice_dist.second = DOWN;
-                /*if(currentCell.col == next.col){
-                    if(currentCell.row+choice[i/2] > currentCell.row){
-                        choice_dist.first += 2;
-                    }
-                }*/
                 break;
             case 3: choice_dist.second = RIGHT;
-                /*if(currentCell.row == next.row){
-                    if(currentCell.col+choice[i/2] > currentCell.col){
-                            choice_dist.first += 2;
-                    }
-                }*/
                 break;
             default: printf("err\n"); break;
         }
         preferredMove.push_back(choice_dist);
     }
-    //Pruning delle mosse
+    //Moves pruning
     std::sort(preferredMove.begin(), preferredMove.end(), sortVector);
     for(int i = 0; i < preferredMove.size(); i++){
     }
@@ -313,7 +567,7 @@ bool preferredDirection(Cell& start, vector<vector<bool>>& visited, int N, int M
                 break;
         }
         //Insert if it is valid
-        if(!stop(start, visited, N, M, nextRow, nextCol)){
+        if(!stop(visited, N, M, nextRow, nextCol)){
             bool toInsert = true;
             bool toReallyInsert = true;
             if(toInsert){
@@ -352,8 +606,6 @@ bool preferredDirection(Cell& start, vector<vector<bool>>& visited, int N, int M
                         if(us.find(nextMove) != us.end()){
                             nextMove = *(us.find(nextMove));
                             isRing = true;
-                        } else {
-                            //! NOT GONNA TELL YOU AGAIN
                         }
                         if(nextMove.latestMove.size() > 0){
                             toReallyInsert = false;
@@ -409,18 +661,14 @@ bool preferredDirection(Cell& start, vector<vector<bool>>& visited, int N, int M
                                 }
                                 if(toReallyInsert){
                                     prunedMoves.push_back(preferredMove[i].second);
-                                    //cout << "inserisco NON ANELLO PT 1: " << preferredMove[i].second << endl;
                                 }
                             } else {
                                 prunedMoves.push_back(preferredMove[i].second);
-                                //cout << "inserisco NON ANELLO PT 2: " << preferredMove[i].second << endl;
                             }
                         }
                     } 
                 }
             }
-        } else {
-            //! AGAIN WITH AN EMPTY ELSE
         }
     }
     goStraightOn = false;
@@ -428,13 +676,14 @@ bool preferredDirection(Cell& start, vector<vector<bool>>& visited, int N, int M
     return toRtn;
 }
 
-bool preferredRingDirectionMK2(Cell &start, vector<vector<bool>>& visited, int N, int M, Cell& currentCell, Cell& next, vector<char>& prunedMoves, char *path, int cursor, bool& changeDirection, unordered_set<Cell, MyHashFunction>& us, bool& goStraightOn){
+bool preferredRingDirection(vector<vector<bool>>& visited, int N, int M, Cell& currentCell, Cell& next, vector<char>& prunedMoves, char *path, int cursor, bool& changeDirection, unordered_set<Cell, MyHashFunction>& us, bool& goStraightOn){
     int choice[2] = {-1, 1};
     int minDistance = INT_MAX;
     int tmpMin;
     bool toRtn = false;
     vector<pair<int, char>> preferredMove;
     for(int i = 0; i < 4; i++){
+        //Mimimum distance and move calculus
         pair<int, char> choice_dist;
         if(i%2 == 0){
             choice_dist.first = abs(currentCell.row + choice[i/2] - next.row) + abs(currentCell.col - next.col);
@@ -443,38 +692,20 @@ bool preferredRingDirectionMK2(Cell &start, vector<vector<bool>>& visited, int N
         }
         switch(i){
             case 0:  choice_dist.second = UP;
-                /*if(currentCell.col == next.col){
-                    if(currentCell.row+choice[i/2] < currentCell.row){
-                            choice_dist.first += 2;
-                    }
-                }*/
                 break;
             case 1: choice_dist.second = LEFT;
-                /*if(currentCell.row == next.row){
-                    if(currentCell.col+choice[i/2] < currentCell.col){
-                            choice_dist.first += 2;
-                    }
-                }*/
                 break;
             case 2: choice_dist.second = DOWN;
-                /*if(currentCell.col == next.col){
-                    if(currentCell.row+choice[i/2] > currentCell.row){
-                        choice_dist.first += 2;
-                    }
-                }*/
                 break;
             case 3: choice_dist.second = RIGHT;
-                /*if(currentCell.row == next.row){
-                    if(currentCell.col+choice[i/2] > currentCell.col){
-                            choice_dist.first += 2;
-                    }
-                }*/
                 break;
             default: printf("err\n"); break;
         }
         preferredMove.push_back(choice_dist);
     }
+    //Sort by lower cost
     std::sort(preferredMove.begin(), preferredMove.end(), sortVector);
+
     for(int i = 0; i < 4; i++){
         int nextRow;
         int nextCol;
@@ -496,9 +727,12 @@ bool preferredRingDirectionMK2(Cell &start, vector<vector<bool>>& visited, int N
                 nextCol = currentCell.col;
                 break;
         }
-        if(!stop(start, visited, N, M, nextRow, nextCol)){
+
+        //Moves puning
+        if(!stop(visited, N, M, nextRow, nextCol)){
             bool toInsert = true;
             bool toReallyInsert = true;
+            //RULES IMPLEMENTATION
             if(currentCell.type == BLACK){
                 if(cursor > 0){
                     switch(path[cursor-1]){
@@ -516,7 +750,6 @@ bool preferredRingDirectionMK2(Cell &start, vector<vector<bool>>& visited, int N
                             break;
                     }
                 }
-                //TODO... set go straight to true and if it is set then the next need to check the previous move
             } else {
                 if(cursor > 1){
                     if(path[cursor-1] != path[cursor-2]){
@@ -540,6 +773,7 @@ bool preferredRingDirectionMK2(Cell &start, vector<vector<bool>>& visited, int N
                     }
                 }
             }
+            //RULES IMPLEMENTATION
             if(toInsert){
                 if(changeDirection){
                     switch(path[cursor-1]){
@@ -631,11 +865,9 @@ bool preferredRingDirectionMK2(Cell &start, vector<vector<bool>>& visited, int N
                                 }
                                 if(toReallyInsert){
                                     prunedMoves.push_back(preferredMove[i].second);
-                                    //cout << "inserisco ANELLO PT 1: " << preferredMove[i].second << endl;
                                 }
                             } else {
                                 prunedMoves.push_back(preferredMove[i].second);
-                                //cout << "inserisco ANELLO PT 2: " << preferredMove[i].second << endl;
                             }
                         }
                     } 
@@ -651,48 +883,22 @@ bool preferredRingDirectionMK2(Cell &start, vector<vector<bool>>& visited, int N
     return toRtn;
 }
 
-
-
-
-bool reachableCell(Cell& next, int N, int M, int nextRow, int nextCol){
-    bool reachable = false;
-    if(nextRow < N && nextCol < M && nextRow >= 0 && nextCol >= 0 && nextRow == next.row && nextCol == next.col){
-        reachable = true;
-    }
-    return reachable;
-}
-
-Cell nearestRingV2(int N, int M, unordered_set<Cell, MyHashFunction>& us, int startRow, int startCol){
+Cell nearestRing(int N, int M, unordered_set<Cell, MyHashFunction>& ringsSet, int startRow, int startCol){
     int minDistance = INT_MAX;
-    int minPriority = INT_MAX;
     int tmpMin;
     Cell min;
     min.row = N;
     min.col = M;
-    for(auto it = us.begin(); it != us.end(); it++){
+    for(auto it = ringsSet.begin(); it != ringsSet.end(); it++){
         tmpMin = abs(startRow - (*it).row) + abs(startCol - (*it).col);
-        if((*it).priority < minPriority){
-                minDistance = tmpMin;
-                minPriority = (*it).priority;
-                min.row = (*it).row;
-                min.col = (*it).col;
-                min.id = (*it).id;
-                min.type = (*it).type;
-                min.priority = (*it).priority;
-                min.latestMove = (*it).latestMove;
-                min.valid = (*it).valid;
-        } else if((*it).priority == minPriority){
-            if(minDistance > tmpMin){
-                minDistance = tmpMin;
-                minPriority = (*it).priority;
-                min.row = (*it).row;
-                min.col = (*it).col;
-                min.id = (*it).id;
-                min.type = (*it).type;
-                min.priority = (*it).priority;
-                min.latestMove = (*it).latestMove;
-                min.valid = (*it).valid;
-            }
+        if(minDistance > tmpMin){
+            minDistance = tmpMin;
+            min.row = (*it).row;
+            min.col = (*it).col;
+            min.id = (*it).id;
+            min.type = (*it).type;
+            min.latestMove = (*it).latestMove;
+            min.valid = (*it).valid;
         }
     }
     return min;
@@ -707,7 +913,7 @@ void setSafeRing(Cell& currentRing, Cell& safeRing){
     safeRing.valid = currentRing.valid;
 }
 
-bool greedyV3(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, int currentCol, unordered_set<Cell, MyHashFunction>& us, unordered_set<Cell, MyHashFunction>& validRing, unordered_set<Cell, MyHashFunction>& AHHHHHHHHHHHHHH, int currentRing, const int totalRing, char *path, int& cursor, const int N, const int M, vector<vector<bool>> &visited, int pendingMoves, stack<pair<int, int>>& toUnlock, bool changeDirection, char move, double &partialSolution, bool& goStraightOn, int turnToClose){
+bool greedyRecursion(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, int currentCol, unordered_set<Cell, MyHashFunction>& unvisitedRings, unordered_set<Cell, MyHashFunction>& validRings, unordered_set<Cell, MyHashFunction>& totalRings, int currentRings, const int ringsAmount, char *path, int& cursor, const int N, const int M, vector<vector<bool>> &visited, int pendingMoves, stack<pair<int, int>>& toUnlock, bool changeDirection, char move, double &partialSolution, bool& goStraightOn, int turnToClose){
     bool isRing = false;
     bool closed = false;
     Cell currentCell;
@@ -715,20 +921,21 @@ bool greedyV3(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, i
     currentCell.row = currentRow;
     currentCell.id = currentRow*M + currentCol;
     vector<char> prunedMoves;
-    //cout << "goStraightOn settata a " << goStraightOn << endl;
-    //cout << "sono " << currentRow << " " << currentCol << " voglio andare a " << nextRing.row << " " << nextRing.col << " e posso chiudermi tra " << turnToClose << endl;
+    //The move is added in the pending moves
     if(move != EMPTY){
         path[cursor] = move;
         cursor++;
         pendingMoves++;
         toUnlock.push(pair<int,int>(currentRow, currentCol));
     }
-    //! PENDING MOVES
+    //I am on the target ring
     if(nextRing.col == currentCol && nextRing.row == currentRow){
-        if(us.find(nextRing) != us.end()){
+        if(unvisitedRings.find(nextRing) != unvisitedRings.end()){
             currentCell.type = nextRing.type;
             currentCell.latestMove = nextRing.latestMove;
             currentCell.valid = nextRing.valid;
+            //If the ring is not the starting one
+            //It is set as safe ring
             if(startRing.col != currentCol || startRing.row != currentRow){
                 safeRing.col = currentCell.col;
                 safeRing.row = currentCell.row;
@@ -738,14 +945,15 @@ bool greedyV3(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, i
                 safeRing.valid = currentCell.valid;
                 pendingMoves = 0;
             }
-            currentRing++;
+            //Not unvisited anymore
+            currentRings++;
             turnToClose--;
-            // TODO... check if all data are catafrattamente distrutti male
             Cell tmp;
-            us.erase(nextRing);
-            validRing.insert(nextRing);
+            unvisitedRings.erase(nextRing);
+            validRings.insert(nextRing);
             isRing = true;
-
+            //If I have to close then I set the target ring as the starting ring
+            //Otherwise the next ring is the nearest ring based on the current position
             if(turnToClose == 0){
                 nextRing.col = startRing.col;
                 nextRing.row = startRing.row;
@@ -753,76 +961,73 @@ bool greedyV3(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, i
                 nextRing.type = startRing.type;
                 nextRing.latestMove = startRing.latestMove;
                 nextRing.valid = startRing.valid;
-                nextRing.priority = startRing.priority;
-                //TODO si può anche cambiare
                 turnToClose = 1;
             }else{
-                tmp = nearestRingV2(N, M, us, safeRing.row, safeRing.col);
-                //cout << "nuovo target " << tmp.row << " " << tmp.col << endl;
+                tmp = nearestRing(N, M, unvisitedRings, safeRing.row, safeRing.col);
                 nextRing.col = tmp.col;
                 nextRing.row = tmp.row;
                 nextRing.id = tmp.id;
                 nextRing.type = tmp.type;
                 nextRing.latestMove = tmp.latestMove;
                 nextRing.valid = tmp.valid;
-                nextRing.priority = tmp.priority;
             }
-            // TODO... if you are in the starting node the unlock the path you used until now to reach the start, set the safe ring to the last reached and the start another recursion
         }
-    } else if(AHHHHHHHHHHHHHH.find(currentCell) != AHHHHHHHHHHHHHH.end()){
-            unordered_set<Cell, MyHashFunction> :: iterator itr = AHHHHHHHHHHHHHH.find(currentCell);
-            currentCell.priority = (*itr).priority;
-            currentCell.type = (*itr).type;
-            currentCell.latestMove = (*itr).latestMove;
-            currentCell.valid = (*itr).valid;
+    } else if(totalRings.find(currentCell) != totalRings.end()){
+        //The path ends up in a random ring, then it must be counted as a safe one
+        unordered_set<Cell, MyHashFunction> :: iterator itr = totalRings.find(currentCell);
+        currentCell.type = (*itr).type;
+        currentCell.latestMove = (*itr).latestMove;
+        currentCell.valid = (*itr).valid;
 
-            safeRing.col = currentCell.col;
-            safeRing.row = currentCell.row;
-            safeRing.id = currentCell.id;
-            safeRing.type = currentCell.type;
-            safeRing.latestMove = currentCell.latestMove;
-            safeRing.valid = currentCell.valid;
-            if(currentCell.row == startRing.row && currentCell.col == startRing.col){
-                return false;
-            } else {
-                us.erase(currentCell);
-            }
-            currentRing++;
-            validRing.insert(currentCell);
-            // TODO... check if all data are catafrattamente distrutti male
-            isRing = true;
-            pendingMoves = 0;
-            turnToClose--;
-            if(turnToClose == 0){
-                nextRing.col = startRing.col;
-                nextRing.row = startRing.row;
-                nextRing.id = startRing.id;
-                nextRing.type = startRing.type;
-                nextRing.latestMove = startRing.latestMove;
-                nextRing.valid = startRing.valid;
-                nextRing.priority = startRing.priority;
-                //TODO si può anche cambiare
-                turnToClose = 1;
-            }else{
-                nextRing = nearestRingV2(N, M, us, currentCell.row, currentCell.col);
-            }
+        safeRing.col = currentCell.col;
+        safeRing.row = currentCell.row;
+        safeRing.id = currentCell.id;
+        safeRing.type = currentCell.type;
+        safeRing.latestMove = currentCell.latestMove;
+        safeRing.valid = currentCell.valid;
+
+        //The path is closed
+        if(currentCell.row == startRing.row && currentCell.col == startRing.col){
+            return false;
+        } else {
+            unvisitedRings.erase(currentCell);
+        }
+
+        currentRings++;
+        validRings.insert(currentCell);
+        isRing = true;
+        pendingMoves = 0;
+        turnToClose--;
+
+        //If I have to close then I set the target ring as the starting ring
+        //Otherwise the next ring is the nearest ring based on the current position
+        if(turnToClose == 0){
+            nextRing.col = startRing.col;
+            nextRing.row = startRing.row;
+            nextRing.id = startRing.id;
+            nextRing.type = startRing.type;
+            nextRing.latestMove = startRing.latestMove;
+            nextRing.valid = startRing.valid;
+            turnToClose = 1;
+        }else{
+            nextRing = nearestRing(N, M, unvisitedRings, currentCell.row, currentCell.col);
+        }
     }
 
-    float currentSolution = 5*((float)validRing.size()/totalRing);
-    
+    //Score of the current solution
+    float currentSolution = 5*((float)validRings.size()/ringsAmount);
     if(currentCell.row != startRing.row || currentCell.col != startRing.col){
         currentSolution /= 2.0;
-    } else {
-        //! EMPTY ELSE LMAO
     }
     
+    //Writing the solution only if it is valid and if it is better than the previous one
     if(partialSolution < currentSolution){
         if(!goStraightOn && !changeDirection){
             path[cursor] = '\0';
-            if(currentRing == totalRing + 1){
-                out << totalRing << " " << cursor << " " << startRing.row << " " << startRing.col << " " << path << END << endl;
+            if(currentRings == ringsAmount + 1){
+                out << ringsAmount << " " << cursor << " " << startRing.row << " " << startRing.col << " " << path << END << endl;
             }else{
-                out << validRing.size() << " " << cursor << " " << startRing.row << " " << startRing.col << " " << path << END << endl;
+                out << validRings.size() << " " << cursor << " " << startRing.row << " " << startRing.col << " " << path << END << endl;
             }
             partialSolution = currentSolution;
         }
@@ -830,10 +1035,11 @@ bool greedyV3(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, i
         path[cursor] = '\0';
     }
     
+    //Solution rollback. If the currentCell is the startinRing then pending moves are considered valid and the cursor is reset
     if(!(currentRow == startRing.row && currentCol == startRing.col)){
         visited[currentRow][currentCol] = true;
     } else {
-        nextRing = nearestRingV2(N, M, us, safeRing.row, safeRing.col);
+        nextRing = nearestRing(N, M, unvisitedRings, safeRing.row, safeRing.col);
         currentCell.col = safeRing.col;
         currentCell.row = safeRing.row;
         currentCell.id = safeRing.id;
@@ -849,18 +1055,20 @@ bool greedyV3(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, i
         pendingMoves = 0;
         isRing = true;
     }
+
+    //RULES IMPLEMENTATION
     if(cursor > 0){
         if(isRing){
             if(currentCell.type == WHITE){
-                if(AHHHHHHHHHHHHHH.find(currentCell) != AHHHHHHHHHHHHHH.end()){
-                    AHHHHHHHHHHHHHH.erase(currentCell);
+                if(totalRings.find(currentCell) != totalRings.end()){
+                    totalRings.erase(currentCell);
                     currentCell.latestMove.resize(1);
                     currentCell.latestMove[0] = path[cursor-1];
-                    AHHHHHHHHHHHHHH.insert(currentCell);
+                    totalRings.insert(currentCell);
                 }
             } else {
-                if(AHHHHHHHHHHHHHH.find(currentCell) != AHHHHHHHHHHHHHH.end()){
-                    AHHHHHHHHHHHHHH.erase(currentCell);
+                if(totalRings.find(currentCell) != totalRings.end()){
+                    totalRings.erase(currentCell);
                     currentCell.latestMove.resize(2);
                     switch(path[cursor-1]){
                         case LEFT:
@@ -880,14 +1088,15 @@ bool greedyV3(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, i
                             currentCell.latestMove.push_back(RIGHT);
                             break;
                     }
-                    AHHHHHHHHHHHHHH.insert(currentCell);
+                    totalRings.insert(currentCell);
                 }
             }
         }
     }
     
+    //If we are in a ring then we try to reach our target in the direction that is consider the best one, RULE IMPLEMENTATION PART 2
     if(isRing){
-        if(preferredRingDirectionMK2(startRing, visited, N, M, currentCell, nextRing, prunedMoves, path, cursor, changeDirection, AHHHHHHHHHHHHHH, goStraightOn)){
+        if(preferredRingDirection(visited, N, M, currentCell, nextRing, prunedMoves, path, cursor, changeDirection, totalRings, goStraightOn)){
             goStraightOn = true;
         }
         if(currentCell.type == WHITE){
@@ -900,11 +1109,13 @@ bool greedyV3(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, i
             goStraightOn = true;
         }
     } else {
-        if(preferredDirection(startRing, visited, N, M, currentCell, nextRing, prunedMoves, changeDirection, path, cursor, AHHHHHHHHHHHHHH, goStraightOn)){
+        if(preferredDirection(visited, N, M, currentCell, nextRing, prunedMoves, changeDirection, path, cursor, totalRings, goStraightOn)){
             goStraightOn = true;
         }
         changeDirection = false;
     }
+
+    //If we are allowed to do a move
     if(prunedMoves.size()>0){
         int nextRow;
         int nextCol;
@@ -926,19 +1137,21 @@ bool greedyV3(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, i
                 nextCol = currentCell.col;
                 break;
         }
+
+        //First move
         if(cursor == 0){
             if(isRing){
                 if(currentCell.type == WHITE){
-                    if(AHHHHHHHHHHHHHH.find(currentCell) != AHHHHHHHHHHHHHH.end()){
-                        AHHHHHHHHHHHHHH.erase(currentCell);
+                    if(totalRings.find(currentCell) != totalRings.end()){
+                        totalRings.erase(currentCell);
                         currentCell.latestMove.resize(1);
                         currentCell.latestMove[0] = prunedMoves[0];
-                        AHHHHHHHHHHHHHH.insert(currentCell);
+                        totalRings.insert(currentCell);
                     }
                     
                 } else {
-                    if(AHHHHHHHHHHHHHH.find(currentCell) != AHHHHHHHHHHHHHH.end()){
-                        AHHHHHHHHHHHHHH.erase(currentCell);
+                    if(totalRings.find(currentCell) != totalRings.end()){
+                        totalRings.erase(currentCell);
                         currentCell.latestMove.resize(2);
                         switch(prunedMoves[0]){
                             case LEFT:
@@ -958,24 +1171,20 @@ bool greedyV3(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, i
                                 currentCell.latestMove.push_back(RIGHT);
                                 break;
                         }
-                        AHHHHHHHHHHHHHH.insert(currentCell);
+                        totalRings.insert(currentCell);
                     }
                 }
             }
         }
-        
-        if(greedyV3(nextRing, startRing, safeRing, nextRow, nextCol, us, validRing, AHHHHHHHHHHHHHH, currentRing, totalRing, path, cursor, N, M, visited, pendingMoves, toUnlock, changeDirection, prunedMoves[0], partialSolution, goStraightOn, turnToClose)){
+        //Recursion
+        if(greedyRecursion(nextRing, startRing, safeRing, nextRow, nextCol, unvisitedRings, validRings, totalRings, currentRings, ringsAmount, path, cursor, N, M, visited, pendingMoves, toUnlock, changeDirection, prunedMoves[0], partialSolution, goStraightOn, turnToClose)){
             return true;
-        } else {
-            //! EMPTY AGAIN
         }
     }
 }
 
-
-Cell maybeNotNearestRing(int N, int M, unordered_set<Cell, MyHashFunction>& us, int startRow, int startCol){
+Cell maybeNotNearestRing(int N, int M, unordered_set<Cell, MyHashFunction>& ringsSet, int startRow, int startCol){
     int minDistance = INT_MAX;
-    int minPriority = INT_MAX;
     int tmpMin;
     Cell min;
     min.row = N;
@@ -991,15 +1200,14 @@ Cell maybeNotNearestRing(int N, int M, unordered_set<Cell, MyHashFunction>& us, 
 
     int soMushRandomImGonnaCry = myUnifIntDist(myRandomEngine);
     if(soMushRandomImGonnaCry <= 50){
-        std::uniform_int_distribution<int> myUnifIntDist2(0, us.size()-1);
+        std::uniform_int_distribution<int> myUnifIntDist2(0, ringsSet.size()-1);
         int toExtract = myUnifIntDist2(myRandomEngine);
-        for(auto it = us.begin(); it != us.end(); it++){
+        for(auto it = ringsSet.begin(); it != ringsSet.end(); it++){
             if(toExtract == 0){
                 min.row = (*it).row;
                 min.col = (*it).col;
                 min.id = (*it).id;
                 min.type = (*it).type;
-                min.priority = (*it).priority;
                 min.latestMove = (*it).latestMove;
                 min.valid = (*it).valid;
                 return min;
@@ -1007,30 +1215,16 @@ Cell maybeNotNearestRing(int N, int M, unordered_set<Cell, MyHashFunction>& us, 
             toExtract--;
         }
     } else {
-        for(auto it = us.begin(); it != us.end(); it++){
+        for(auto it = ringsSet.begin(); it != ringsSet.end(); it++){
             tmpMin = abs(startRow - (*it).row) + abs(startCol - (*it).col);
-            if((*it).priority < minPriority){
-                    minDistance = tmpMin;
-                    minPriority = (*it).priority;
-                    min.row = (*it).row;
-                    min.col = (*it).col;
-                    min.id = (*it).id;
-                    min.type = (*it).type;
-                    min.priority = (*it).priority;
-                    min.latestMove = (*it).latestMove;
-                    min.valid = (*it).valid;
-            } else if((*it).priority == minPriority){
-                if(minDistance > tmpMin){
-                    minDistance = tmpMin;
-                    minPriority = (*it).priority;
-                    min.row = (*it).row;
-                    min.col = (*it).col;
-                    min.id = (*it).id;
-                    min.type = (*it).type;
-                    min.priority = (*it).priority;
-                    min.latestMove = (*it).latestMove;
-                    min.valid = (*it).valid;
-                }
+            if(minDistance > tmpMin){
+                minDistance = tmpMin;
+                min.row = (*it).row;
+                min.col = (*it).col;
+                min.id = (*it).id;
+                min.type = (*it).type;
+                min.latestMove = (*it).latestMove;
+                min.valid = (*it).valid;
             }
         }
     }
@@ -1038,27 +1232,29 @@ Cell maybeNotNearestRing(int N, int M, unordered_set<Cell, MyHashFunction>& us, 
 }
 
 
-bool notSoGreedyAnymoreBitch(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, int currentCol, unordered_set<Cell, MyHashFunction>& us, unordered_set<Cell, MyHashFunction>& validRing, unordered_set<Cell, MyHashFunction>& AHHHHHHHHHHHHHH, int currentRing, const int totalRing, char *path, int& cursor, const int N, const int M, vector<vector<bool>> &visited, int pendingMoves, stack<pair<int, int>>& toUnlock, bool changeDirection, char move, double &partialSolution, bool& goStraightOn, int turnToClose){
+bool notSoGreedyRecursion(Cell& nextRing, Cell& startRing, Cell& safeRing, int currentRow, int currentCol, unordered_set<Cell, MyHashFunction>& unvisitedRings, unordered_set<Cell, MyHashFunction>& validRings, unordered_set<Cell, MyHashFunction>& totalRings, int currentRings, const int ringsAmount, char *path, int& cursor, const int N, const int M, vector<vector<bool>> &visited, int pendingMoves, stack<pair<int, int>>& toUnlock, bool changeDirection, char move, double &partialSolution, bool& goStraightOn, int turnToClose){
     bool isRing = false;
     bool closed = false;
     Cell currentCell;
-    //cout << "sono " << currentRow << " " << currentCol << " voglio andare a " << nextRing.row << " " << nextRing.col << " e posso chiudermi tra " << turnToClose << endl;
     currentCell.col = currentCol;
     currentCell.row = currentRow;
     currentCell.id = currentRow*M + currentCol;
     vector<char> prunedMoves;
+    //The move is added in the pending moves
     if(move != EMPTY){
         path[cursor] = move;
         cursor++;
         pendingMoves++;
         toUnlock.push(pair<int,int>(currentRow, currentCol));
     }
-    //! PENDING MOVES
+    //I am on the target ring
     if(nextRing.col == currentCol && nextRing.row == currentRow){
-        if(us.find(nextRing) != us.end()){
+        if(unvisitedRings.find(nextRing) != unvisitedRings.end()){
             currentCell.type = nextRing.type;
             currentCell.latestMove = nextRing.latestMove;
             currentCell.valid = nextRing.valid;
+            //If the ring is not the starting one
+            //It is set as safe ring
             if(startRing.col != currentCol || startRing.row != currentRow){
                 safeRing.col = currentCell.col;
                 safeRing.row = currentCell.row;
@@ -1067,14 +1263,16 @@ bool notSoGreedyAnymoreBitch(Cell& nextRing, Cell& startRing, Cell& safeRing, in
                 safeRing.latestMove = currentCell.latestMove;
                 safeRing.valid = currentCell.valid;
                 pendingMoves = 0;
-            }
-            currentRing++;
+            } 
+            //Not unvisited anymore
+            currentRings++;
             turnToClose--;
             Cell tmp;
             isRing = true;
-            us.erase(nextRing);
-            validRing.insert(nextRing);
-            // TODO... check if all data are catafrattamente distrutti male
+            //If I have to close then I set the target ring as the starting ring
+            //Otherwise the next ring is the nearest ring based on the current position
+            unvisitedRings.erase(nextRing);
+            validRings.insert(nextRing);
             if(turnToClose == 0){
                 nextRing.col = startRing.col;
                 nextRing.row = startRing.row;
@@ -1082,81 +1280,85 @@ bool notSoGreedyAnymoreBitch(Cell& nextRing, Cell& startRing, Cell& safeRing, in
                 nextRing.type = startRing.type;
                 nextRing.latestMove = startRing.latestMove;
                 nextRing.valid = startRing.valid;
-                nextRing.priority = startRing.priority;
-                //TODO si può anche cambiare
                 turnToClose = 1;
             }else{
-                tmp = maybeNotNearestRing(N, M, us, currentCell.row, currentCell.col);
+                tmp = maybeNotNearestRing(N, M, unvisitedRings, currentCell.row, currentCell.col);
                 nextRing.col = tmp.col;
                 nextRing.row = tmp.row;
                 nextRing.id = tmp.id;
                 nextRing.type = tmp.type;
                 nextRing.latestMove = tmp.latestMove;
                 nextRing.valid = tmp.valid;
-                nextRing.priority = tmp.priority;
             }
-            // TODO... if you are in the starting node the unlock the path you used until now to reach the start, set the safe ring to the last reached and the start another recursion
         }
-    } else if(AHHHHHHHHHHHHHH.find(currentCell) != AHHHHHHHHHHHHHH.end()){
-            unordered_set<Cell, MyHashFunction> :: iterator itr = AHHHHHHHHHHHHHH.find(currentCell);
-            currentCell.priority = (*itr).priority;
-            currentCell.type = (*itr).type;
-            currentCell.latestMove = (*itr).latestMove;
-            currentCell.valid = (*itr).valid;
+    } else if(totalRings.find(currentCell) != totalRings.end()){
+        //The path ends up in a random ring, then it must be counted as a safe one
+        unordered_set<Cell, MyHashFunction> :: iterator itr = totalRings.find(currentCell);
+        currentCell.type = (*itr).type;
+        currentCell.latestMove = (*itr).latestMove;
+        currentCell.valid = (*itr).valid;
 
-            safeRing.col = currentCell.col;
-            safeRing.row = currentCell.row;
-            safeRing.id = currentCell.id;
-            safeRing.type = currentCell.type;
-            safeRing.latestMove = currentCell.latestMove;
-            safeRing.valid = currentCell.valid;
-            if(currentCell.row == startRing.row && currentCell.col == startRing.col){
-                return false;
-            } else {
-                us.erase(currentCell);
-            }
-            currentRing++;
-            validRing.insert(currentCell);
-            isRing = true;
-            pendingMoves = 0;
-            turnToClose--;
-            if(turnToClose == 0){
-                nextRing.col = startRing.col;
-                nextRing.row = startRing.row;
-                nextRing.id = startRing.id;
-                nextRing.type = startRing.type;
-                nextRing.latestMove = startRing.latestMove;
-                nextRing.valid = startRing.valid;
-                nextRing.priority = startRing.priority;
-                //TODO si può anche cambiare
-                turnToClose = 1;
-            }else{
-                nextRing = maybeNotNearestRing(N, M, us, currentCell.row, currentCell.col);
-            }
+        safeRing.col = currentCell.col;
+        safeRing.row = currentCell.row;
+        safeRing.id = currentCell.id;
+        safeRing.type = currentCell.type;
+        safeRing.latestMove = currentCell.latestMove;
+        safeRing.valid = currentCell.valid;
+
+        //The path is closed
+        if(currentCell.row == startRing.row && currentCell.col == startRing.col){
+            return false;
+        } else {
+            unvisitedRings.erase(currentCell);
+        }
+
+        currentRings++;
+        validRings.insert(currentCell);
+        isRing = true;
+        pendingMoves = 0;
+        turnToClose--;
+
+        //If I have to close then I set the target ring as the starting ring
+        //Otherwise the next ring is the nearest ring based on the current position
+        if(turnToClose == 0){
+            nextRing.col = startRing.col;
+            nextRing.row = startRing.row;
+            nextRing.id = startRing.id;
+            nextRing.type = startRing.type;
+            nextRing.latestMove = startRing.latestMove;
+            nextRing.valid = startRing.valid;
+            turnToClose = 1;
+        }else{
+            nextRing = maybeNotNearestRing(N, M, unvisitedRings, currentCell.row, currentCell.col);
+        }
     }
-    float currentSolution = 5*((float)validRing.size()/totalRing);
+
+    //Score of the current solution
+    float currentSolution = 5*((float)validRings.size()/ringsAmount);
     if(currentCell.row != startRing.row || currentCell.col != startRing.col){
         currentSolution /= 2.0;
-    } else {
-        //! WHY NOT AN EMPTY ELSE
-    }
+    } 
+
+    //Writing the solution only if it is valid and if it is better than the previous one
     if(partialSolution < currentSolution){
         if(!goStraightOn && !changeDirection){
             path[cursor] = '\0';
-            if(currentRing == totalRing + 1){
-                out << totalRing << " " << cursor << " " << startRing.row << " " << startRing.col << " " << path << END << endl;
+            if(currentRings == ringsAmount + 1){
+                out << ringsAmount << " " << cursor << " " << startRing.row << " " << startRing.col << " " << path << END << endl;
             }else{
-                out << validRing.size() << " " << cursor << " " << startRing.row << " " << startRing.col << " " << path << END << endl;
+                out << validRings.size() << " " << cursor << " " << startRing.row << " " << startRing.col << " " << path << END << endl;
             }
             partialSolution = currentSolution;
         }
     } else {
         path[cursor] = '\0';
     }
+
+    //Solution rollback. If the currentCell is the startinRing then pending moves are considered valid and the cursor is reset
     if(!(currentRow == startRing.row && currentCol == startRing.col)){
         visited[currentRow][currentCol] = true;
     } else {
-        nextRing = maybeNotNearestRing(N, M, us, safeRing.row, safeRing.col);
+        nextRing = maybeNotNearestRing(N, M, unvisitedRings, safeRing.row, safeRing.col);
         currentCell.col = safeRing.col;
         currentCell.row = safeRing.row;
         currentCell.id = safeRing.id;
@@ -1170,21 +1372,22 @@ bool notSoGreedyAnymoreBitch(Cell& nextRing, Cell& startRing, Cell& safeRing, in
         }
         cursor = cursor - pendingMoves;
         pendingMoves = 0;
-        //printVisited(visited, N, M);
         isRing = true;
     }
+
+    //RULES IMPLEMENTATION
     if(cursor > 0){
         if(isRing){
             if(currentCell.type == WHITE){
-                if(AHHHHHHHHHHHHHH.find(currentCell) != AHHHHHHHHHHHHHH.end()){
-                    AHHHHHHHHHHHHHH.erase(currentCell);
+                if(totalRings.find(currentCell) != totalRings.end()){
+                    totalRings.erase(currentCell);
                     currentCell.latestMove.resize(1);
                     currentCell.latestMove[0] = path[cursor-1];
-                    AHHHHHHHHHHHHHH.insert(currentCell);
+                    totalRings.insert(currentCell);
                 }  
             } else {
-                if(AHHHHHHHHHHHHHH.find(currentCell) != AHHHHHHHHHHHHHH.end()){
-                    AHHHHHHHHHHHHHH.erase(currentCell);
+                if(totalRings.find(currentCell) != totalRings.end()){
+                    totalRings.erase(currentCell);
                     currentCell.latestMove.resize(2);
                     switch(path[cursor-1]){
                         case LEFT:
@@ -1204,13 +1407,15 @@ bool notSoGreedyAnymoreBitch(Cell& nextRing, Cell& startRing, Cell& safeRing, in
                             currentCell.latestMove.push_back(RIGHT);
                             break;
                     }
-                    AHHHHHHHHHHHHHH.insert(currentCell);
+                    totalRings.insert(currentCell);
                 }
             }
         }
     }
+
+    //If we are in a ring then we try to reach our target in the direction that is consider the best one, RULE IMPLEMENTATION PART 2
     if(isRing){
-        if(preferredRingDirectionMK2(startRing, visited, N, M, currentCell, nextRing, prunedMoves, path, cursor, changeDirection, AHHHHHHHHHHHHHH, goStraightOn)){
+        if(preferredRingDirection(visited, N, M, currentCell, nextRing, prunedMoves, path, cursor, changeDirection, totalRings, goStraightOn)){
             goStraightOn = true;
         }
         if(currentCell.type == WHITE){
@@ -1223,11 +1428,13 @@ bool notSoGreedyAnymoreBitch(Cell& nextRing, Cell& startRing, Cell& safeRing, in
             goStraightOn = true;
         }
     } else {
-        if(preferredDirection(startRing, visited, N, M, currentCell, nextRing, prunedMoves, changeDirection, path, cursor, AHHHHHHHHHHHHHH, goStraightOn)){
+        if(preferredDirection(visited, N, M, currentCell, nextRing, prunedMoves, changeDirection, path, cursor, totalRings, goStraightOn)){
             goStraightOn = true;
         }
         changeDirection = false;
     }
+
+    //If we are allowed to do a move
     if(prunedMoves.size()>0){
         int nextRow;
         int nextCol;
@@ -1249,19 +1456,21 @@ bool notSoGreedyAnymoreBitch(Cell& nextRing, Cell& startRing, Cell& safeRing, in
                 nextCol = currentCell.col;
                 break;
         }
+
+        //First move
         if(cursor == 0){
             if(isRing){
                 if(currentCell.type == WHITE){
-                    if(AHHHHHHHHHHHHHH.find(currentCell) != AHHHHHHHHHHHHHH.end()){
-                        AHHHHHHHHHHHHHH.erase(currentCell);
+                    if(totalRings.find(currentCell) != totalRings.end()){
+                        totalRings.erase(currentCell);
                         currentCell.latestMove.resize(1);
                         currentCell.latestMove[0] = prunedMoves[0];
-                        AHHHHHHHHHHHHHH.insert(currentCell);
+                        totalRings.insert(currentCell);
                     }
                     
                 } else {
-                    if(AHHHHHHHHHHHHHH.find(currentCell) != AHHHHHHHHHHHHHH.end()){
-                        AHHHHHHHHHHHHHH.erase(currentCell);
+                    if(totalRings.find(currentCell) != totalRings.end()){
+                        totalRings.erase(currentCell);
                         currentCell.latestMove.resize(2);
                         switch(prunedMoves[0]){
                             case LEFT:
@@ -1281,22 +1490,20 @@ bool notSoGreedyAnymoreBitch(Cell& nextRing, Cell& startRing, Cell& safeRing, in
                                 currentCell.latestMove.push_back(RIGHT);
                                 break;
                         }
-                        AHHHHHHHHHHHHHH.insert(currentCell);
+                        totalRings.insert(currentCell);
                     }
                 }
             }
         }
         
-        if(notSoGreedyAnymoreBitch(nextRing, startRing, safeRing, nextRow, nextCol, us, validRing, AHHHHHHHHHHHHHH, currentRing, totalRing, path, cursor, N, M, visited, pendingMoves, toUnlock, changeDirection, prunedMoves[0], partialSolution, goStraightOn, turnToClose)){
+        if(notSoGreedyRecursion(nextRing, startRing, safeRing, nextRow, nextCol, unvisitedRings, validRings, totalRings, currentRings, ringsAmount, path, cursor, N, M, visited, pendingMoves, toUnlock, changeDirection, prunedMoves[0], partialSolution, goStraightOn, turnToClose)){
             return true;
-        } else {
-            //! BEST ELSE IS EMPTY ELSE
         }
     }
 }
 
 
-int wrapper(Cell nextRing, unordered_set<Cell, MyHashFunction> us, unordered_set<Cell, MyHashFunction> validRing, unordered_set<Cell, MyHashFunction> AHHHHHHHHHHHHHH, int totalRing, char *path, int cursor, int N, int M, vector<vector<bool>> visited, double &partialPoint, int turnToClose){
+int greedyWrapper(Cell nextRing, unordered_set<Cell, MyHashFunction> unvisitedRings, unordered_set<Cell, MyHashFunction> validRings, unordered_set<Cell, MyHashFunction> totalRings, int ringsAmount, char *path, int cursor, int N, int M, vector<vector<bool>> visited, double &partialPoint, int turnToClose){
     Cell safeRing;
     Cell startRing;
     startRing.col = safeRing.col = nextRing.col;
@@ -1312,16 +1519,16 @@ int wrapper(Cell nextRing, unordered_set<Cell, MyHashFunction> us, unordered_set
     stack<pair<int,int>> toUnlock;
     bool changeDirection = false;
     bool goStraightOn = false;
-    greedyV3(nextRing, startRing,  safeRing, nextRing.row, nextRing.col, us, validRing, AHHHHHHHHHHHHHH, currentRing, totalRing, path, cursor, N, M, visited, pendingMoves, toUnlock, changeDirection, EMPTY, partialPoint, goStraightOn, turnToClose);
-    //TODO... keep going maybe there's hope
+    greedyRecursion(nextRing, startRing,  safeRing, nextRing.row, nextRing.col, unvisitedRings, validRings, totalRings, currentRing, ringsAmount, path, cursor, N, M, visited, pendingMoves, toUnlock, changeDirection, EMPTY, partialPoint, goStraightOn, turnToClose);
     if(startRing.row == nextRing.row && startRing.col == nextRing.col){
-        return validRing.size();
+        return validRings.size();
     } else {
         return 0;
     }
 }
 
-int wrapper2(Cell nextRing, unordered_set<Cell, MyHashFunction> us, unordered_set<Cell, MyHashFunction> validRing, unordered_set<Cell, MyHashFunction> AHHHHHHHHHHHHHH, int totalRing, char *path, int cursor, int N, int M, vector<vector<bool>> visited, double &partialPoint, int turnToClose){
+
+int notSoGreedyWrapper(Cell nextRing, unordered_set<Cell, MyHashFunction> unvisitedRings, unordered_set<Cell, MyHashFunction> validRings, unordered_set<Cell, MyHashFunction> totalRings, int ringsAmount, char *path, int cursor, int N, int M, vector<vector<bool>> visited, double &partialPoint, int turnToClose){
     Cell safeRing;
     Cell startRing;
     startRing.col = safeRing.col = nextRing.col;
@@ -1337,26 +1544,20 @@ int wrapper2(Cell nextRing, unordered_set<Cell, MyHashFunction> us, unordered_se
     stack<pair<int,int>> toUnlock;
     bool changeDirection = false;
     bool goStraightOn = false;
-    notSoGreedyAnymoreBitch(nextRing, startRing,  safeRing, nextRing.row, nextRing.col, us, validRing, AHHHHHHHHHHHHHH, currentRing, totalRing, path, cursor, N, M, visited, pendingMoves, toUnlock, changeDirection, EMPTY, partialPoint, goStraightOn, turnToClose);
+    notSoGreedyRecursion(nextRing, startRing,  safeRing, nextRing.row, nextRing.col, unvisitedRings, validRings, totalRings, currentRing, ringsAmount, path, cursor, N, M, visited, pendingMoves, toUnlock, changeDirection, EMPTY, partialPoint, goStraightOn, turnToClose);
     if(startRing.row == nextRing.row && startRing.col == nextRing.col){
-        return validRing.size();
+        return validRings.size();
     } else {
         return 0;
     }
-    //TODO... keep going maybe there's hope
 }
 
 
 
 /**
- * Do or do not. There is no try.
+ * Do or do not. There is no try. 
  */
 int main(){
-
-    //! CERCARE DI FERMARLO IL PRIMA POSSIBILE QUANDO NON PUO' CHIUDERSI, SCELTE RANDOM
-    //! L'ALGORITMO DEVE PROVARE A CHIUDERSI SOLO DOPO AVER ATTRAVERSATO UN NUMERO MAGGIORE DI ANELLI RISPETTO A UN PERCORSO GIA' CHIUSO
-
-
     int N, M, B, W;
     int cursor = 0;
     int length = 0;
@@ -1372,16 +1573,13 @@ int main(){
 
     unordered_set<Cell, MyHashFunction> us;
     unordered_set<Cell, MyHashFunction> validRing;
-    unordered_set<Cell, MyHashFunction> AHHHHHHHHHHHHHH;
 
-    vector<vector<int>> matrix;
-    matrix.resize(M, vector<int>(N));
     vector<vector<bool>> visited;
     visited.resize(M, vector<bool>(N));
     int tmpI, tmpJ, startI, startJ;
+
     for(int i = 0; i < N; i++){
         for(int j = 0; j < M; j++){
-            matrix[i][j] = EMPTY;
             visited[i][j] = false;
         }
     }
@@ -1389,12 +1587,9 @@ int main(){
         Cell c;
         in >> c.row >> c.col;
         c.type = BLACK;
-        c.priority = 0;
         c.id = c.row*M + c.col;
         c.valid = true;
         us.insert(c);
-        AHHHHHHHHHHHHHH.insert(c);
-        matrix[c.row][c.col] = BLACK;
         lastBlackCol = c.col;
         lastBlackRow = c.row;
     }
@@ -1410,28 +1605,26 @@ int main(){
             c.latestMove.push_back(UP);
             c.latestMove.push_back(DOWN);
         }
-        c.priority = 0;
         c.id = c.row*M + c.col;
         us.insert(c);
-        AHHHHHHHHHHHHHH.insert(c);
-        matrix[c.row][c.col] = WHITE;
     }
 
+    //SQUARE CASE
     bool squared = false;
     if(B == 4) {
         squared = true;
         for(int i=0; i<4 && squared; i++){
             if(i%2==0) {
-                if(!goRigth(&lastBlackRow,&lastBlackCol, N, M, matrix, path, &cursor, &length, &nRing)){
-                    if(!goLeft(&lastBlackRow,&lastBlackCol, N, M, matrix, path, &cursor, &length, &nRing)){
+                if(!goRigth(&lastBlackRow,&lastBlackCol, N, M, us, path, &cursor, &length, &nRing)){
+                    if(!goLeft(&lastBlackRow,&lastBlackCol, N, M, us, path, &cursor, &length, &nRing)){
                         squared = false;
                     } else {
                         squared = true;
                     }
                 }
             } else {
-                if(!goUp(&lastBlackRow,&lastBlackCol, N, M, matrix, path, &cursor, &length, &nRing)){
-                    if(!goDown(&lastBlackRow,&lastBlackCol, N, M, matrix, path, &cursor, &length, &nRing)){
+                if(!goUp(&lastBlackRow,&lastBlackCol, N, M, us, path, &cursor, &length, &nRing)){
+                    if(!goDown(&lastBlackRow,&lastBlackCol, N, M, us, path, &cursor, &length, &nRing)){
                         squared = false;
                     } else {
                         squared = true;
@@ -1441,13 +1634,12 @@ int main(){
         }
         if(squared){
             path[cursor] = 0;
-            ofstream out("output.txt");
             out << nRing << " " << length << " " << lastBlackRow << " " << lastBlackCol << " " << path << END;
         } 
     }
 
+    //NOT SQUARE CASE
     if(!squared) {
-
         std::random_device myRandomDevice;
         unsigned seed = myRandomDevice();
         
@@ -1455,15 +1647,20 @@ int main(){
 
         std::uniform_int_distribution<int> myUnifIntDist(0, N-1);
 
-        Cell nextRing = nearestRingV2(N, M, us, 0, 0);
+        Cell nextRing = nearestRing(N, M, us, 0, 0);
         double partialPoint = 0.0;
         int turnToClose = us.size()/2;
         int maxRingReached = -1;
         int currentRings = 0;
 
+        //We call both the greedy and the random functions
         while(true){
-            currentRings = wrapper(nextRing, us, validRing, AHHHHHHHHHHHHHH, B+W, path, cursor, N, M, visited, partialPoint, turnToClose);
-            //cout << "PRIMA: turn to close pari a " << turnToClose << " anelli massimi raggiunti " << maxRingReached << " anelli trovati ora " << currentRings << endl;
+            /**
+             * GREEDY CALL
+             */
+            currentRings = greedyWrapper(nextRing, us, validRing, us, B+W, path, cursor, N, M, visited, partialPoint, turnToClose);
+            
+            //Updating of the number of rings to reach to try to close the path
             if(maxRingReached < currentRings){
                 maxRingReached = currentRings;
             } else {
@@ -1482,10 +1679,13 @@ int main(){
             }
 
             nextRing = maybeNotNearestRing(N, M, us, myUnifIntDist(myRandomEngine), myUnifIntDist(myRandomEngine));
-            //cout << "DOPO: turn to close pari a " << turnToClose << "anelli massimi raggiunti " << maxRingReached << " anelli trovati ora " << currentRings << endl;
             
-            currentRings = wrapper2(nextRing, us, validRing, AHHHHHHHHHHHHHH, B+W, path, cursor, N, M, visited, partialPoint, turnToClose);
+            /**
+             * NOT GREEDY CALL
+             */
+            currentRings = notSoGreedyWrapper(nextRing, us, validRing, us, B+W, path, cursor, N, M, visited, partialPoint, turnToClose);
 
+            //Updating of the number of rings to reach to try to close the path
             if(maxRingReached < currentRings){
                 maxRingReached = currentRings;
             } else {
@@ -1504,7 +1704,6 @@ int main(){
             }
             
             nextRing = maybeNotNearestRing(N, M, us, myUnifIntDist(myRandomEngine), myUnifIntDist(myRandomEngine));
-            
         }
     }
     return 0;
