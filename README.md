@@ -4,3 +4,4 @@
 
 Il problema consisteva nel trovare il percoso che attraversasse più anelli possibili (rispettando le regole di attraversamento) in un tempo massimo fissato. La soluzione proposta fa uso di diverse tecniche di programmazione: greedy, scelta casuale, backtrack con pruning. 
 Nella repository è possibile trovare: il dataset usato per la correzione e valutazione del progetto, il testo del progetto con tutte le specifiche e una breve spiegazione della soluzione proposta. 
+Per compilare ed eseguire il codice consultare il file "prog2.testo.pdf". 
